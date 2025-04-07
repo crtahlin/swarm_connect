@@ -3,6 +3,7 @@ Simpler server for accessing some Swarm features.
 
 ## Project structure
 
+```
 swarm_api_aggregator/
 ├── app/                    # Main application package
 │   ├── __init__.py
@@ -33,3 +34,4 @@ swarm_api_aggregator/
 ├── requirements.txt        # Python package dependencies
 ├── README.md               # Project description, setup, and usage instructions
 └── run.py                  # Script to easily run the development server
+``` 
