@@ -1,0 +1,130 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a FastAPI-based service that provides a simplified API layer for accessing Swarm (EthSwarm Bee) features. The application acts as an aggregator that connects to Swarm Bee nodes and exposes specific functionality through REST endpoints.
+
+## Development Commands
+
+### Setup and Installation
+```bash
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Setup environment
+cp .env.example .env
+# Edit .env to configure SWARM_BEE_API_URL
+```
+
+### Running the Application
+```bash
+# Development server (with auto-reload)
+python run.py
+
+# Custom port (if 8000 is taken)
+PORT=8001 python run.py
+
+# HTTPS development (requires SSL certificates)
+SSL_KEYFILE=./localhost+2-key.pem SSL_CERTFILE=./localhost+2.pem python run.py
+```
+
+### Testing
+Currently no test framework is configured. Tests would go in the `tests/` directory.
+
+## Architecture Overview
+
+### Application Structure
+- **FastAPI Application**: Main app defined in `app/main.py` with modular router inclusion
+- **Configuration Management**: Centralized in `app/core/config.py` using Pydantic Settings with .env support
+- **API Layer**: Organized under `app/api/` with separate endpoints and models
+- **Service Layer**: External API integration handled in `app/services/`
+- **Models**: Pydantic models for request/response validation in `app/api/models/`
+
+### Key Components
+
+**Core Configuration (`app/core/config.py`)**:
+- Uses `pydantic-settings` for environment variable management
+- Validates SWARM_BEE_API_URL as proper URL format
+- Cached settings object with `@lru_cache()` for performance
+
+**Swarm Integration (`app/services/swarm_api.py`)**:
+- Handles HTTP requests to Swarm Bee API (`/batches` endpoint)
+- Includes error handling for network issues and malformed responses
+- Supports both direct list responses and `{"batches": [...]}` wrapper formats
+
+**Stamps API (`app/api/endpoints/stamps.py`)**:
+- Provides `/api/v1/stamps/{stamp_id}` endpoint
+- Fetches all stamps from Swarm and filters by ID
+- Calculates expiration time: `current_time + batchTTL`
+- Comprehensive error handling with appropriate HTTP status codes
+
+**Data Models (`app/api/models/stamp.py`)**:
+- `StampDetails` model with optional fields to handle missing data from upstream API
+- Field aliases for API compatibility (`amount` aliased as `value`, etc.)
+- Calculated `expectedExpiration` field in `YYYY-MM-DD-HH-MM` UTC format
+
+### Environment Configuration
+
+Required environment variables:
+- `SWARM_BEE_API_URL`: URL to Swarm Bee node API (e.g., `https://api.gateway.ethswarm.org`)
+
+Optional environment variables:
+- `HOST`: Server host (default: `127.0.0.1`)
+- `PORT`: Server port (default: `8000`)
+- `RELOAD`: Enable auto-reload (default: `true`)
+- `SSL_KEYFILE`/`SSL_CERTFILE`: For HTTPS development
+
+### API Endpoints
+
+- `GET /`: Health check endpoint
+- `GET /api/v1/stamps/{stamp_id}`: Retrieve specific Swarm stamp batch details
+
+### Dependencies and Tech Stack
+
+- **FastAPI**: Web framework with automatic OpenAPI documentation
+- **Uvicorn**: ASGI server with performance extras
+- **Requests**: HTTP client for Swarm API integration
+- **Pydantic**: Data validation and settings management
+- **python-dotenv**: Environment file loading
+
+### Development Notes
+
+- No tests are currently implemented
+- CORS middleware is commented out but ready to enable
+- Authentication/authorization placeholder code exists but not implemented
+- SSL/HTTPS support built into development server
+- Logging configured at INFO level with structured error handling
+
+## Documentation Maintenance
+
+### Architecture Documentation
+When making changes to the codebase, ensure the architecture documentation stays current:
+
+1. **README.md Architecture Section**: Update the "Architecture" section whenever you:
+   - Add new endpoints or features
+   - Modify the system architecture or data flow
+   - Change core components or their interactions
+   - Add new layers or services
+   - Update the feature list or capabilities
+
+2. **Key Areas to Update**:
+   - System Overview diagram: Reflect new components or connections
+   - Core Features: Add new functionality descriptions
+   - Component Architecture: Document new modules or significant changes
+   - Data Flow: Update if request/response handling changes
+   - Key Value Propositions: Add new benefits or capabilities
+
+3. **Maintenance Guidelines**:
+   - Keep diagrams in sync with actual code structure
+   - Update feature descriptions to match current capabilities
+   - Ensure component descriptions reflect actual file organization
+   - Validate that environment variables and configuration are current
+   - Update dependency lists when adding new packages
+
+**Important**: The architecture documentation serves as the primary reference for understanding the system. Always verify that changes to the codebase are reflected in both the README.md Architecture section and this CLAUDE.md file.
