@@ -1,6 +1,6 @@
 # app/api/models/stamp.py
 from pydantic import BaseModel, Field
-from typing import Optional # Ensure Optional is imported
+from typing import Optional, List # Ensure Optional and List are imported
 
 class StampDetails(BaseModel):
     """
@@ -46,5 +46,74 @@ class StampDetails(BaseModel):
                 "usable": None,
                 "label": None,
                 "expectedExpiration": "2024-08-15-10-30"
+            }
+        }
+
+
+class StampPurchaseRequest(BaseModel):
+    """Request model for purchasing a new postage stamp."""
+    amount: int = Field(..., description="The amount of the postage stamp in wei.", example=1000000000)
+    depth: int = Field(..., description="The depth of the postage stamp.", example=17)
+    label: Optional[str] = Field(None, description="Optional user-defined label for the stamp.", example="my-stamp")
+
+
+class StampPurchaseResponse(BaseModel):
+    """Response model for successful stamp purchase."""
+    batchID: str = Field(..., description="The unique identifier of the purchased stamp batch.")
+    message: str = Field(..., description="Success message.")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "batchID": "000de42079daebd58347bb38ce05bdc477701d93651d3bba318a9aee3fbd786a",
+                "message": "Postage stamp purchased successfully"
+            }
+        }
+
+
+class StampExtensionRequest(BaseModel):
+    """Request model for extending a postage stamp."""
+    amount: int = Field(..., description="Additional amount to add to the stamp in wei.", example=500000000)
+
+
+class StampExtensionResponse(BaseModel):
+    """Response model for successful stamp extension."""
+    batchID: str = Field(..., description="The unique identifier of the extended stamp batch.")
+    message: str = Field(..., description="Success message.")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "batchID": "000de42079daebd58347bb38ce05bdc477701d93651d3bba318a9aee3fbd786a",
+                "message": "Postage stamp extended successfully"
+            }
+        }
+
+
+class StampListResponse(BaseModel):
+    """Response model for listing all stamps."""
+    stamps: List[StampDetails] = Field(..., description="List of all available stamp batches")
+    total_count: int = Field(..., description="Total number of stamps")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "stamps": [
+                    {
+                        "batchID": "000de42079daebd58347bb38ce05bdc477701d93651d3bba318a9aee3fbd786a",
+                        "amount": "303440675840",
+                        "blockNumber": 36541095,
+                        "owner": "1fb1f1d3620eab8e3b69dd2b2c40933a61c7f276",
+                        "depth": 20,
+                        "bucketDepth": 16,
+                        "immutableFlag": False,
+                        "batchTTL": 16971999,
+                        "utilization": None,
+                        "usable": None,
+                        "label": None,
+                        "expectedExpiration": "2024-08-15-10-30"
+                    }
+                ],
+                "total_count": 1
             }
         }

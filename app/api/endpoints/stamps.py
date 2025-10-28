@@ -6,10 +6,68 @@ from requests.exceptions import RequestException
 import logging
 
 from app.services import swarm_api
-from app.api.models.stamp import StampDetails
+from app.api.models.stamp import (
+    StampDetails,
+    StampPurchaseRequest,
+    StampPurchaseResponse,
+    StampExtensionRequest,
+    StampExtensionResponse,
+    StampListResponse
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+@router.get(
+    "/stamps",
+    response_model=StampListResponse,
+    summary="List All Swarm Stamp Batches",
+    tags=["stamps"]
+)
+async def list_stamps() -> Any:
+    """
+    Retrieves a list of all postage stamp batches from the Swarm network.
+
+    Fetches all available stamp batches, processes them to calculate expiration times,
+    and returns a comprehensive list with stamp details.
+
+    Returns:
+        StampListResponse: Contains list of all stamps and total count
+
+    Raises:
+        HTTPException: 502 if Swarm API is unreachable, 500 for other errors
+    """
+    try:
+        processed_stamps = swarm_api.get_all_stamps_processed()
+
+        # Convert to StampDetails objects for proper validation
+        stamp_details = []
+        for stamp_data in processed_stamps:
+            try:
+                stamp_detail = StampDetails(**stamp_data)
+                stamp_details.append(stamp_detail)
+            except Exception as e:
+                logger.warning(f"Skipping invalid stamp data: {e}")
+                continue
+
+        return StampListResponse(
+            stamps=stamp_details,
+            total_count=len(stamp_details)
+        )
+
+    except RequestException as e:
+        logger.error(f"Failed to retrieve stamps from Swarm API: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not fetch stamp data from the Swarm Bee node: {e}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error fetching stamps: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while fetching stamp data."
+        )
+
 
 @router.get(
     "/stamps/{stamp_id}",
@@ -106,3 +164,117 @@ async def get_stamp_details(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while processing the stamp data."
          )
+
+
+@router.post(
+    "/stamps",
+    response_model=StampPurchaseResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Purchase a New Swarm Postage Stamp",
+    tags=["stamps"]
+)
+async def purchase_stamp(
+    stamp_request: StampPurchaseRequest
+) -> Any:
+    """
+    Purchases a new postage stamp from the Swarm network.
+
+    Creates a new postage stamp batch with the specified amount and depth.
+    Optional label can be provided for easier identification.
+
+    Args:
+        stamp_request: Purchase request containing amount, depth, and optional label
+
+    Returns:
+        StampPurchaseResponse: Contains the new batch ID and success message
+
+    Raises:
+        HTTPException: 502 if Swarm API is unreachable, 500 for other errors
+    """
+    try:
+        batch_id = swarm_api.purchase_postage_stamp(
+            amount=stamp_request.amount,
+            depth=stamp_request.depth,
+            label=stamp_request.label
+        )
+
+        return StampPurchaseResponse(
+            batchID=batch_id,
+            message="Postage stamp purchased successfully"
+        )
+
+    except RequestException as e:
+        logger.error(f"Failed to purchase stamp from Swarm API: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not purchase stamp from the Swarm Bee node: {e}"
+        )
+    except ValueError as e:
+        logger.error(f"Invalid response from Swarm API during stamp purchase: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalid response from Swarm API: {e}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during stamp purchase: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while purchasing the stamp."
+        )
+
+
+@router.patch(
+    "/stamps/{stamp_id}/extend",
+    response_model=StampExtensionResponse,
+    summary="Extend an Existing Swarm Postage Stamp",
+    tags=["stamps"]
+)
+async def extend_stamp(
+    stamp_id: str = Path(..., description="The Batch ID of the stamp to extend.", example="a1b2c3d4e5f6..."),
+    extension_request: StampExtensionRequest = ...
+) -> Any:
+    """
+    Extends an existing postage stamp by adding more funds to it.
+
+    This operation adds the specified amount to the existing stamp,
+    extending its validity period and increasing its balance.
+
+    Args:
+        stamp_id: The batch ID of the stamp to extend
+        extension_request: Extension request containing the additional amount
+
+    Returns:
+        StampExtensionResponse: Contains the batch ID and success message
+
+    Raises:
+        HTTPException: 502 if Swarm API is unreachable, 500 for other errors
+    """
+    try:
+        batch_id = swarm_api.extend_postage_stamp(
+            stamp_id=stamp_id,
+            amount=extension_request.amount
+        )
+
+        return StampExtensionResponse(
+            batchID=batch_id,
+            message="Postage stamp extended successfully"
+        )
+
+    except RequestException as e:
+        logger.error(f"Failed to extend stamp {stamp_id} from Swarm API: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not extend stamp from the Swarm Bee node: {e}"
+        )
+    except ValueError as e:
+        logger.error(f"Invalid response from Swarm API during stamp extension: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalid response from Swarm API: {e}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during stamp extension for {stamp_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while extending the stamp."
+        )
