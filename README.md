@@ -4,23 +4,23 @@ Simpler server for accessing some Swarm features.
 ## Project structure
 
 ```
-swarm_api_aggregator/
+swarm_connect/
 ├── app/                    # Main application package
 │   ├── __init__.py
 │   ├── main.py             # FastAPI app instantiation and router inclusion
 │   ├── api/                # API specific modules
 │   │   ├── __init__.py
-│   │   ├── deps.py         # Dependency injection functions (e.g., for auth later)
 │   │   ├── endpoints/      # API route definitions
 │   │   │   ├── __init__.py
-│   │   │   └── stamps.py   # Endpoint(s) related to Swarm Stamps
+│   │   │   ├── stamps.py   # Endpoints for Swarm stamp management
+│   │   │   └── data.py     # Endpoints for data upload/download
 │   │   └── models/         # Pydantic models for request/response validation
 │   │       ├── __init__.py
-│   │       └── stamp.py    # Pydantic model(s) for Stamp data
+│   │       ├── stamp.py    # Pydantic models for stamp data
+│   │       └── data.py     # Pydantic models for data operations
 │   ├── core/               # Core application logic/configuration
 │   │   ├── __init__.py
-│   │   ├── config.py       # Configuration management (e.g., loading .env)
-│   │   └── security.py     # Security related functions (auth, https setup later)
+│   │   └── config.py       # Configuration management (e.g., loading .env)
 │   └── services/           # Logic for interacting with external services
 │       ├── __init__.py
 │       └── swarm_api.py    # Functions to call the EthSwarm Bee API
@@ -57,7 +57,7 @@ export PORT=8001
 
 ## Architecture
 
-Swarm Connect is a FastAPI-based API gateway that simplifies access to Ethereum Swarm (distributed storage network) functionality. Instead of clients directly calling complex Swarm Bee node APIs, they can use this cleaner, more focused interface.
+Swarm Connect is a FastAPI-based API gateway that provides comprehensive access to Ethereum Swarm (distributed storage network) functionality. It offers complete postage stamp management and data operations through a clean, RESTful interface, eliminating the need for clients to interact directly with complex Swarm Bee node APIs.
 
 ### System Overview
 
@@ -77,8 +77,8 @@ Swarm Connect is a FastAPI-based API gateway that simplifies access to Ethereum 
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                        API LAYER                                   │   │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐ │   │
-│  │  │   Health Check  │  │   OpenAPI Docs  │  │   Stamps Endpoint   │ │   │
-│  │  │   GET /         │  │   /docs /redoc  │  │ GET /api/v1/stamps/ │ │   │
+│  │  │   Health Check  │  │   OpenAPI Docs  │  │  Stamps & Data APIs │ │   │
+│  │  │   GET /         │  │   /docs /redoc  │  │   Complete CRUD     │ │   │
 │  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘ │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                       │
@@ -132,11 +132,18 @@ Swarm Connect is a FastAPI-based API gateway that simplifies access to Ethereum 
 
 ### Core Features
 
-#### 🚀 API Features
-- **Stamp Lookup**: Retrieve detailed information about specific Swarm postage stamps by batch ID
+#### 🚀 Stamp Management API
+- **Purchase Stamps**: Create new postage stamps with specified amount and depth
+- **Extend Stamps**: Add funds to existing stamps to extend their validity
+- **List All Stamps**: Retrieve comprehensive list of all available stamps
+- **Get Stamp Details**: Fetch specific stamp information by batch ID
 - **Expiration Calculation**: Automatically calculates stamp expiration time (current time + TTL)
-- **Data Aggregation**: Fetches all stamps and filters for specific ones
-- **JSON API**: RESTful endpoints with structured JSON responses
+
+#### 📁 Data Operations API
+- **Raw Data Upload**: Upload binary data directly to Swarm network
+- **Raw Data Download**: Download data as binary stream or base64-encoded JSON
+- **Content-Type Support**: Configurable content types for uploaded data
+- **Reference-Based Access**: Access data using Swarm reference hashes
 
 #### 🔧 Technical Features
 - **FastAPI Framework**: Modern, fast web framework with automatic OpenAPI documentation
@@ -145,6 +152,8 @@ Swarm Connect is a FastAPI-based API gateway that simplifies access to Ethereum 
 - **Error Handling**: Comprehensive error responses with appropriate HTTP status codes
 - **Configuration Management**: Environment-based settings with validation
 - **Development Server**: Hot-reload development server with SSL support
+- **Binary Data Support**: Direct binary upload/download with optional JSON wrapping
+- **Modular Design**: Separate endpoints for stamps and data operations
 
 #### 🛡️ Reliability Features
 - **Request Timeouts**: 10-second timeout for external API calls
@@ -186,8 +195,47 @@ Swarm Connect is a FastAPI-based API gateway that simplifies access to Ethereum 
 
 ### Key Value Propositions
 
-1. **Simplified Interface**: Clean REST API vs complex Swarm protocols
-2. **Enhanced Data**: Adds calculated expiration times to raw stamp data
-3. **Reliability**: Robust error handling and timeout management
-4. **Developer Experience**: Auto-generated docs and type safety
-5. **Flexibility**: Configurable for different Swarm node endpoints
+1. **Complete Gateway Solution**: Full stamp lifecycle and data operations in one service
+2. **Simplified Interface**: Clean REST API vs complex Swarm protocols
+3. **Enhanced Data**: Adds calculated expiration times to raw stamp data
+4. **Reliability**: Robust error handling and timeout management
+5. **Developer Experience**: Auto-generated docs and type safety
+6. **Flexibility**: Configurable for different Swarm node endpoints
+7. **Binary Support**: Native handling of raw data with multiple access patterns
+
+## API Endpoints
+
+### Stamp Management Endpoints
+
+#### `POST /api/v1/stamps/`
+Purchase a new postage stamp.
+- **Request Body**: `{"amount": 1000000000, "depth": 17, "label": "my-stamp"}`
+- **Response**: `{"batchID": "...", "message": "Postage stamp purchased successfully"}`
+
+#### `GET /api/v1/stamps/`
+List all available postage stamps.
+- **Response**: `{"stamps": [...], "total_count": N}`
+
+#### `GET /api/v1/stamps/{stamp_id}`
+Get detailed information about a specific stamp.
+- **Response**: Detailed stamp information with calculated expiration time
+
+#### `PATCH /api/v1/stamps/{stamp_id}/extend`
+Extend an existing stamp by adding more funds.
+- **Request Body**: `{"amount": 500000000}`
+- **Response**: `{"batchID": "...", "message": "Postage stamp extended successfully"}`
+
+### Data Operation Endpoints
+
+#### `POST /api/v1/data/?stamp_id={id}&content_type={type}`
+Upload raw binary data to Swarm.
+- **Request Body**: Raw binary data
+- **Response**: `{"reference": "...", "message": "Data uploaded successfully"}`
+
+#### `GET /api/v1/data/{reference}`
+Download raw data from Swarm as binary stream.
+- **Response**: Raw binary data with `application/octet-stream` content type
+
+#### `GET /api/v1/data/{reference}/json`
+Download data as JSON with base64-encoded content.
+- **Response**: `{"data": "base64-encoded-content", "size": N, "reference": "..."}`
