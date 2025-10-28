@@ -140,28 +140,81 @@ def extend_postage_stamp(stamp_id: str, amount: int) -> str:
         raise ValueError(f"Could not parse stamp extension response: {e}") from e
 
 
+def calculate_usable_status(stamp: Dict[str, Any]) -> bool:
+    """
+    Calculates if a stamp is usable based on available data.
+    A stamp is considered usable if:
+    1. It has a positive TTL (not expired)
+    2. It exists
+    3. It's not immutable or has reasonable depth for uploads
+
+    Args:
+        stamp: The stamp data from /batches endpoint
+
+    Returns:
+        Boolean indicating if the stamp is usable
+    """
+    try:
+        # Check if stamp exists
+        if not stamp.get("exists", True):
+            return False
+
+        # Check TTL - if TTL is very low, stamp is likely expired or about to expire
+        batch_ttl = int(stamp.get("batchTTL", 0))
+        if batch_ttl <= 0:
+            return False
+
+        # Check if it's immutable - immutable stamps may have restrictions
+        is_immutable = stamp.get("immutableFlag", False) or stamp.get("immutable", False)
+
+        # For immutable stamps, require higher TTL threshold for safety
+        min_ttl = 3600 if is_immutable else 60  # 1 hour for immutable, 1 minute for regular
+
+        if batch_ttl < min_ttl:
+            return False
+
+        # Additional checks could include:
+        # - Depth validation (reasonable depth for uploads)
+        # - Amount validation (sufficient balance)
+        depth = stamp.get("depth", 0)
+        if depth < 16 or depth > 32:  # Reasonable depth range
+            return False
+
+        return True
+
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Error calculating usable status for stamp: {e}")
+        return False
+
+
 def get_all_stamps_processed() -> List[Dict[str, Any]]:
     """
     Fetches all postage stamp batches and processes them with expiration calculations.
+    Calculates the usable field based on stamp properties like TTL, depth, and immutability.
 
     Returns:
-        A list of processed stamp dictionaries with calculated expiration times.
+        A list of processed stamp dictionaries with calculated expiration times and usable status.
 
     Raises:
         RequestException: If the HTTP request to the Swarm API fails.
     """
     import datetime
 
-    # Get raw stamps data
+    # Get raw stamps data from /batches endpoint
     all_stamps = get_all_stamps()
     processed_stamps = []
 
     for stamp in all_stamps:
         try:
+            batch_id = stamp.get("batchID")
+            if not batch_id:
+                logger.warning("Skipping stamp with missing batchID")
+                continue
+
             # Calculate expiration time for each stamp
             batch_ttl = int(stamp.get("batchTTL", 0))
             if batch_ttl < 0:
-                logger.warning(f"Stamp {stamp.get('batchID', 'unknown')} has negative TTL: {batch_ttl}. Treating as 0.")
+                logger.warning(f"Stamp {batch_id} has negative TTL: {batch_ttl}. Treating as 0.")
                 batch_ttl = 0
 
             # Calculate expiration based on current time + TTL
@@ -169,11 +222,14 @@ def get_all_stamps_processed() -> List[Dict[str, Any]]:
             expiration_time_utc = now_utc + datetime.timedelta(seconds=batch_ttl)
             expiration_str = expiration_time_utc.strftime('%Y-%m-%d-%H-%M')
 
+            # Calculate usable status based on available stamp data
+            usable = calculate_usable_status(stamp)
+
             # Create processed stamp data
             processed_stamp = {
-                "batchID": stamp.get("batchID"),
+                "batchID": batch_id,
                 "utilization": stamp.get("utilization"),
-                "usable": stamp.get("usable"),
+                "usable": usable,
                 "label": stamp.get("label"),
                 "depth": stamp.get("depth"),
                 "amount": str(stamp.get("amount", "")),  # Ensure amount is string
