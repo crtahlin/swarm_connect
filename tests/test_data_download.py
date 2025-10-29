@@ -264,6 +264,196 @@ class TestJSONDownloadEndpoint:
         decoded_data = base64.b64decode(json_response["data"])
         assert decoded_data == binary_data
 
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_endpoint_response_structure_validation(self, mock_download):
+        """Test that all response fields have correct types and are present."""
+        test_data = b"test content"
+        mock_download.return_value = test_data
+
+        response = client.get("/api/v1/data/structure567890abcdef1234567890abcdef1234567890abcdef1234567890/json")
+
+        assert response.status_code == 200
+        json_response = response.json()
+
+        # Validate field types
+        assert isinstance(json_response["data"], str), "data field should be string (base64)"
+        assert isinstance(json_response["content_type"], str), "content_type should be string"
+        assert isinstance(json_response["size"], int), "size should be integer"
+        assert isinstance(json_response["reference"], str), "reference should be string"
+
+        # Validate field values
+        assert len(json_response["data"]) > 0, "data field should not be empty"
+        assert json_response["size"] > 0, "size should be positive"
+        assert json_response["content_type"] in ["text/plain", "application/octet-stream"], "should detect as text or binary"
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_base64_encoding_integrity(self, mock_download):
+        """Test that base64 encoding preserves data integrity perfectly."""
+        # Test various data types to ensure no corruption
+        test_cases = [
+            ("JSON", json.dumps({"test": "data", "unicode": "测试🚀"}).encode('utf-8')),
+            ("Binary", b'\x00\x01\x02\x03\xFF\xFE\xFD\xFC'),
+            ("PNG", b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x01\x00'),
+            ("UTF-8 text", "Hello 世界! 🌍 Testing Unicode".encode('utf-8')),
+            ("Large binary", b'\xAA' * 10000),  # Large repetitive data
+            ("Mixed binary", bytes(range(256))),  # All possible byte values
+        ]
+
+        for test_name, original_data in test_cases:
+            mock_download.return_value = original_data
+
+            response = client.get(f"/api/v1/data/integrity{hash(test_name):x}567890abcdef1234567890abcdef1234567890/json")
+
+            assert response.status_code == 200, f"Failed for {test_name}"
+            json_response = response.json()
+
+            # Decode and verify integrity
+            decoded_data = base64.b64decode(json_response["data"])
+            assert decoded_data == original_data, f"Data corruption in {test_name}"
+            assert json_response["size"] == len(original_data), f"Size mismatch in {test_name}"
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_endpoint_error_responses(self, mock_download):
+        """Test that JSON endpoint returns proper JSON error responses."""
+        # Test 404 error
+        mock_download.side_effect = FileNotFoundError("File not found")
+
+        response = client.get("/api/v1/data/missing567890abcdef1234567890abcdef1234567890abcdef1234567890/json")
+
+        assert response.status_code == 404
+        assert response.headers["content-type"] == "application/json"
+        error_json = response.json()
+        assert "detail" in error_json
+        assert "Data not found" in error_json["detail"]
+
+        # Test 502 error
+        from requests.exceptions import RequestException
+        mock_download.side_effect = RequestException("Swarm error")
+
+        response = client.get("/api/v1/data/swarmfail567890abcdef1234567890abcdef1234567890abcdef1234567890/json")
+
+        assert response.status_code == 502
+        assert response.headers["content-type"] == "application/json"
+        error_json = response.json()
+        assert "detail" in error_json
+        assert "Failed to download data from Swarm" in error_json["detail"]
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_vs_raw_endpoint_consistency(self, mock_download):
+        """Test that JSON and raw endpoints detect content types consistently."""
+        test_cases = [
+            ("JSON data", json.dumps({"test": "data"}).encode('utf-8'), "application/json"),
+            ("PNG image", b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00', "image/png"),
+            ("Plain text", "Hello world".encode('utf-8'), "text/plain"),
+            ("Binary data", b'\x00\x01\x02\x03', "application/octet-stream"),
+        ]
+
+        reference_base = "consistency567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+        for test_name, test_data, expected_type in test_cases:
+            mock_download.return_value = test_data
+
+            # Test raw endpoint
+            raw_response = client.get(f"/api/v1/data/{reference_base}")
+            assert raw_response.status_code == 200, f"Raw endpoint failed for {test_name}"
+            raw_content_type = raw_response.headers["content-type"]
+
+            # Test JSON endpoint
+            json_response = client.get(f"/api/v1/data/{reference_base}/json")
+            assert json_response.status_code == 200, f"JSON endpoint failed for {test_name}"
+            json_content_type = json_response.json()["content_type"]
+
+            # Both should detect the same content type
+            assert raw_content_type == json_content_type, f"Content type mismatch for {test_name}: raw={raw_content_type}, json={json_content_type}"
+            assert raw_content_type == expected_type, f"Wrong content type for {test_name}: expected={expected_type}, got={raw_content_type}"
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_endpoint_empty_file_handling(self, mock_download):
+        """Test JSON endpoint with empty files."""
+        mock_download.return_value = b""
+
+        response = client.get("/api/v1/data/empty567890abcdef1234567890abcdef1234567890abcdef1234567890ab/json")
+
+        assert response.status_code == 200
+        json_response = response.json()
+
+        assert json_response["size"] == 0
+        assert json_response["data"] == ""  # Empty base64
+        assert json_response["content_type"] == "application/octet-stream"  # Should default to binary
+        assert json_response["reference"] == "empty567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_endpoint_large_file_handling(self, mock_download):
+        """Test JSON endpoint with large files (base64 overhead)."""
+        # 1MB of data
+        large_data = b'A' * (1024 * 1024)
+        mock_download.return_value = large_data
+
+        response = client.get("/api/v1/data/large567890abcdef1234567890abcdef1234567890abcdef1234567890ab/json")
+
+        assert response.status_code == 200
+        json_response = response.json()
+
+        assert json_response["size"] == len(large_data)
+
+        # Verify base64 encoding worked for large file
+        decoded_data = base64.b64decode(json_response["data"])
+        assert len(decoded_data) == len(large_data)
+        assert decoded_data == large_data
+
+        # Base64 encoding increases size by ~33%
+        base64_size = len(json_response["data"])
+        expected_base64_size = (len(large_data) + 2) // 3 * 4  # Base64 encoding formula
+        assert base64_size == expected_base64_size
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_endpoint_unicode_handling(self, mock_download):
+        """Test JSON endpoint with Unicode content."""
+        unicode_data = {
+            "message": "Hello 世界! 🌍",
+            "languages": ["English", "中文", "Español", "العربية"],
+            "emoji": "🚀🌟💫⭐"
+        }
+        unicode_bytes = json.dumps(unicode_data, ensure_ascii=False).encode('utf-8')
+        mock_download.return_value = unicode_bytes
+
+        response = client.get("/api/v1/data/unicode567890abcdef1234567890abcdef1234567890abcdef1234567890/json")
+
+        assert response.status_code == 200
+        json_response = response.json()
+
+        assert json_response["content_type"] == "application/json"
+        assert json_response["size"] == len(unicode_bytes)
+
+        # Verify Unicode is preserved through base64 encoding
+        decoded_data = base64.b64decode(json_response["data"]).decode('utf-8')
+        decoded_json = json.loads(decoded_data)
+        assert decoded_json == unicode_data
+
+    @patch('app.services.swarm_api.download_data_from_swarm')
+    def test_json_endpoint_content_type_accuracy(self, mock_download):
+        """Test that JSON endpoint content type detection is accurate."""
+        test_cases = [
+            # (data, expected_content_type, description)
+            (b'\xFF\xD8\xFF\xE0', "image/jpeg", "JPEG header"),
+            (b'GIF87a', "image/gif", "GIF87a header"),
+            (b'GIF89a', "image/gif", "GIF89a header"),
+            (b'%PDF-1.4', "application/pdf", "PDF header"),
+            (json.dumps({"valid": "json"}).encode(), "application/json", "Valid JSON"),
+            (b'{"invalid": json}', "application/octet-stream", "Invalid JSON should be binary"),
+            ("Plain text content".encode('utf-8'), "text/plain", "UTF-8 text"),
+            (b'\x80\x81\x82', "application/octet-stream", "Invalid UTF-8 should be binary"),
+        ]
+
+        for test_data, expected_type, description in test_cases:
+            mock_download.return_value = test_data
+
+            response = client.get(f"/api/v1/data/typetest{hash(description):x}567890abcdef1234567890abcdef/json")
+
+            assert response.status_code == 200, f"Failed for: {description}"
+            json_response = response.json()
+            assert json_response["content_type"] == expected_type, f"Wrong content type for {description}: expected {expected_type}, got {json_response['content_type']}"
+
 
 class TestMalformedContentHandling:
     """Test handling of malformed or edge case content."""
