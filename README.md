@@ -246,9 +246,21 @@ Upload data to Swarm (JSON or binary).
 - **Features**: Pre-filled with SWIP-compliant provenance data example structure
 
 #### `GET /api/v1/data/{reference}`
-Download raw data from Swarm as binary stream.
-- **Response**: Raw binary data with `application/octet-stream` content type
+Download raw data from Swarm as a file (triggers browser download).
+- **Use case**: End users downloading files, browser integration
+- **Response**: Raw binary data with user-friendly filename
+- **Headers**:
+  - `Content-Disposition: attachment; filename="provenance-abc12345.json"`
+  - `Content-Type`: Auto-detected (application/json, image/png, etc.)
+- **Filenames**:
+  - JSON data → `provenance-{hash}.json`
+  - Images → `image-{hash}.png/jpg`
+  - PDFs → `document-{hash}.pdf`
+  - Text → `text-{hash}.txt`
+  - Binary → `data-{hash}.bin`
 
 #### `GET /api/v1/data/{reference}/json`
-Download data as JSON with base64-encoded content.
-- **Response**: `{"data": "base64-encoded-content", "size": N, "reference": "..."}`
+Download data as JSON with metadata (for API clients).
+- **Use case**: Web apps, mobile apps, API integrations needing metadata
+- **Response**: `{"data": "base64-encoded-content", "content_type": "application/json", "size": 2048, "reference": "abc..."}`
+- **Benefits**: Get file metadata without triggering download, programmatic access

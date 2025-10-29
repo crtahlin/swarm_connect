@@ -113,9 +113,15 @@ async def download_data(
     reference: str = Path(..., description="Swarm reference hash of the data to download")
 ):
     """
-    Download data from the Swarm network and return it as raw bytes.
+    Download data from the Swarm network as a file (triggers browser download).
 
-    This endpoint returns the data directly without JSON wrapping.
+    **Use case**: End users downloading files, browser integration
+
+    **Features**:
+    - User-friendly filenames (provenance-abc12345.json, image-def67890.png, etc.)
+    - Auto-detected content types (application/json, image/png, text/plain, etc.)
+    - Proper download headers for browsers
+    - Direct binary streaming (no JSON wrapper)
     """
     try:
         # Download from Swarm
@@ -152,9 +158,24 @@ async def download_data_json(
     reference: str = Path(..., description="Swarm reference hash of the data to download")
 ):
     """
-    Download data from the Swarm network and return it as JSON with metadata.
+    Download data from the Swarm network as JSON with metadata (for API clients).
 
-    Returns the data as base64-encoded content with metadata for API clients.
+    **Use case**: Web apps, mobile apps, API integrations needing metadata
+
+    **Response format**:
+    ```json
+    {
+        "data": "base64-encoded-content",
+        "content_type": "application/json",
+        "size": 2048,
+        "reference": "abc123..."
+    }
+    ```
+
+    **Benefits**:
+    - Get file metadata without triggering browser download
+    - Programmatic access to file info and content
+    - Base64 encoding for JSON-safe binary data transport
     """
     try:
         # Download from Swarm
