@@ -1,0 +1,24 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    name: build
+    runs-on: [self-hosted, pljudfbee1]
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: build docker image
+        run: docker build -t swarm_connect:$GITHUB_REF_NAME .
+
+      - name: deploy
+        run: >
+          cd /opt/ && rm -rf swarm_connect && git clone https://github.com/datafund/swarm_connect.git && cd swarm_connect && docker compose up -d

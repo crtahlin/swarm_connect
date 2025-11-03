@@ -139,3 +139,9 @@ When making changes to the codebase, ensure the architecture documentation stays
    - Update dependency lists when adding new packages
 
 **Important**: The architecture documentation serves as the primary reference for understanding the system. Always verify that changes to the codebase are reflected in both the README.md Architecture section and this CLAUDE.md file.
+
+## Git Repository Configuration
+
+**IMPORTANT**: This repository pushes to `git@github.com:datafund/swarm_connect.git` (origin). When creating GitHub issues or pull requests, always use the `datafund/swarm_connect` repository, NOT the `crtahlin/swarm_connect` upstream repository.
+
+Use `git remote -v` to verify the correct repository before creating issues.
