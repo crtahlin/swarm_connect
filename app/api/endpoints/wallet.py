@@ -50,7 +50,7 @@ async def get_wallet() -> WalletResponse:
         )
 
 
-@router.get("/chequebook/address", response_model=ChequebookResponse)
+@router.get("/chequebook", response_model=ChequebookResponse)
 async def get_chequebook() -> ChequebookResponse:
     """
     Get the chequebook address and balance information of the Bee node.

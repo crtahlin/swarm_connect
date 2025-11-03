@@ -244,7 +244,7 @@ Swarm Connect is a FastAPI-based API gateway that provides comprehensive access 
 
 #### Wallet Information
 - `GET /api/v1/wallet`: Get the wallet address and BZZ balance of the Bee node
-- `GET /api/v1/chequebook/address`: Get the chequebook address and balance information of the Bee node
+- `GET /api/v1/chequebook`: Get the chequebook address and balance information of the Bee node
 
 ### Key Value Propositions
 
@@ -316,7 +316,7 @@ Get the wallet address and BZZ balance of the connected Bee node.
 - **BZZ Balance**: Returned in wei (smallest unit of BZZ token)
 - **Note**: Only available when connected to local Bee nodes, not public gateways
 
-#### `GET /api/v1/chequebook/address`
+#### `GET /api/v1/chequebook`
 Get the chequebook address and balance information of the connected Bee node.
 - **Response**: `{"chequebookAddress": "0x...", "availableBalance": "1000000000", "totalBalance": "1000000000"}`
 - **Use case**: Identify the chequebook smart contract address and check available funds
