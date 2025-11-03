@@ -243,8 +243,8 @@ Swarm Connect is a FastAPI-based API gateway that provides comprehensive access 
 - `GET /api/v1/data/{reference}/json`: Download data with JSON metadata (base64-encoded)
 
 #### Wallet Information
-- `GET /api/v1/wallet`: Get the wallet address of the Bee node
-- `GET /api/v1/chequebook/address`: Get the chequebook address of the Bee node
+- `GET /api/v1/wallet`: Get the wallet address and BZZ balance of the Bee node
+- `GET /api/v1/chequebook/address`: Get the chequebook address and balance information of the Bee node
 
 ### Key Value Propositions
 
@@ -310,13 +310,17 @@ Download data as JSON with metadata (for API clients).
 ### Wallet Information Endpoints
 
 #### `GET /api/v1/wallet`
-Get the wallet address of the connected Bee node.
-- **Response**: `{"walletAddress": "0x..."}`
-- **Use case**: Identify the Ethereum wallet address associated with the Bee node
+Get the wallet address and BZZ balance of the connected Bee node.
+- **Response**: `{"walletAddress": "0x...", "bzzBalance": "254399000000000"}`
+- **Use case**: Identify the Ethereum wallet address and check BZZ token balance
+- **BZZ Balance**: Returned in wei (smallest unit of BZZ token)
 - **Note**: Only available when connected to local Bee nodes, not public gateways
 
 #### `GET /api/v1/chequebook/address`
-Get the chequebook address of the connected Bee node.
-- **Response**: `{"chequebookAddress": "0x..."}`
-- **Use case**: Identify the chequebook smart contract address for the Bee node
+Get the chequebook address and balance information of the connected Bee node.
+- **Response**: `{"chequebookAddress": "0x...", "availableBalance": "1000000000", "totalBalance": "1000000000"}`
+- **Use case**: Identify the chequebook smart contract address and check available funds
+- **Balance Fields**:
+  - `availableBalance`: Funds available for creating new postage stamps (in wei)
+  - `totalBalance`: Total funds in the chequebook (in wei)
 - **Note**: Only available when connected to local Bee nodes, not public gateways
