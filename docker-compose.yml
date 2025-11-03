@@ -1,6 +1,7 @@
 services:
   provenance_gateway:
     build: .
+    image: swarm_connect:main
     ports:
       - "8899:8000"
     environment:
