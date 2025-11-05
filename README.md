@@ -1,6 +1,12 @@
 # swarm_connect
 Simpler server for accessing some Swarm features.
 
+> ⚠️ **ALPHA SOFTWARE - PROOF OF CONCEPT**
+> This software is in **Alpha stage** and should be considered a **Proof of Concept**. Use for testing and experimentation only. Not recommended for production use.
+
+> ⚠️ **DATA PERSISTENCE WARNING**
+> Storage on Swarm is **rented storage** with limited time periods. The default configuration uses very short rental periods (approximately **1 day**). **Do not expect uploaded data to persist longer than the rental period.** Data will become unavailable when the postage stamp expires.
+
 ## Project structure
 
 ```
@@ -13,11 +19,13 @@ swarm_connect/
 │   │   ├── endpoints/      # API route definitions
 │   │   │   ├── __init__.py
 │   │   │   ├── stamps.py   # Endpoints for Swarm stamp management
-│   │   │   └── data.py     # Endpoints for data upload/download
+│   │   │   ├── data.py     # Endpoints for data upload/download
+│   │   │   └── wallet.py   # Endpoints for wallet information
 │   │   └── models/         # Pydantic models for request/response validation
 │   │       ├── __init__.py
 │   │       ├── stamp.py    # Pydantic models for stamp data
-│   │       └── data.py     # Pydantic models for data operations
+│   │       ├── data.py     # Pydantic models for data operations
+│   │       └── wallet.py   # Pydantic models for wallet information
 │   ├── core/               # Core application logic/configuration
 │   │   ├── __init__.py
 │   │   └── config.py       # Configuration management (e.g., loading .env)
@@ -38,22 +46,42 @@ swarm_connect/
 
 ## Running
 
+### Setup and Installation
 
+```bash
+# Create virtual environment
+python3 -m venv venv
 
-```
-python3 -m venv /path/to/pythonvenv
-# use the binaries in that folder from now on
+# Activate virtual environment (Linux/Mac)
+source venv/bin/activate
+# On Windows: venv\Scripts\activate
 
+# Install dependencies
 pip install -r requirements.txt
 
-# Copy .env.example to .env.
-
-# Edit .env and ensure SWARM_BEE_API_URL points to your Bee node's API endpoint (e.g., http://localhost:1633 or the public gateway https://api.gateway.ethswarm.org).
-
-# if port 8000 is taken, use a different one, e.g.:
-export PORT=8001
-
+# Set up environment file
+cp .env.example .env
+# Edit .env and ensure SWARM_BEE_API_URL points to your Bee node's API endpoint
+# (e.g., http://localhost:1633 or the public gateway https://api.gateway.ethswarm.org)
 ```
+
+### Starting the Server
+
+```bash
+# Start the development server (with auto-reload)
+python run.py
+
+# Optional: Use different port if 8000 is taken
+PORT=8001 python run.py
+
+# For HTTPS development (requires SSL certificates)
+SSL_KEYFILE=./localhost+2-key.pem SSL_CERTFILE=./localhost+2.pem python run.py
+```
+
+The server will be available at:
+- HTTP: http://127.0.0.1:8000
+- API Documentation: http://127.0.0.1:8000/docs
+- Alternative docs: http://127.0.0.1:8000/redoc
 
 ## Architecture
 
@@ -220,6 +248,10 @@ Swarm Connect is a FastAPI-based API gateway that provides comprehensive access 
 - `GET /api/v1/data/{reference}`: Download raw data from Swarm (returns bytes directly)
 - `GET /api/v1/data/{reference}/json`: Download data with JSON metadata (base64-encoded)
 
+#### Wallet Information
+- `GET /api/v1/wallet`: Get the wallet address and BZZ balance of the Bee node
+- `GET /api/v1/chequebook`: Get the chequebook address and balance information of the Bee node
+
 ### Key Value Propositions
 
 1. **Complete Gateway Solution**: Full stamp lifecycle and data operations in one service
@@ -280,3 +312,21 @@ Download data as JSON with metadata (for API clients).
 - **Use case**: Web apps, mobile apps, API integrations needing metadata
 - **Response**: `{"data": "base64-encoded-content", "content_type": "application/json", "size": 2048, "reference": "abc..."}`
 - **Benefits**: Get file metadata without triggering download, programmatic access
+
+### Wallet Information Endpoints
+
+#### `GET /api/v1/wallet`
+Get the wallet address and BZZ balance of the connected Bee node.
+- **Response**: `{"walletAddress": "0x...", "bzzBalance": "254399000000000"}`
+- **Use case**: Identify the Ethereum wallet address and check BZZ token balance
+- **BZZ Balance**: Returned in wei (smallest unit of BZZ token)
+- **Note**: Only available when connected to local Bee nodes, not public gateways
+
+#### `GET /api/v1/chequebook`
+Get the chequebook address and balance information of the connected Bee node.
+- **Response**: `{"chequebookAddress": "0x...", "availableBalance": "1000000000", "totalBalance": "1000000000"}`
+- **Use case**: Identify the chequebook smart contract address and check available funds
+- **Balance Fields**:
+  - `availableBalance`: Funds available for creating new postage stamps (in wei)
+  - `totalBalance`: Total funds in the chequebook (in wei)
+- **Note**: Only available when connected to local Bee nodes, not public gateways

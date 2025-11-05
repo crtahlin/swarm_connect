@@ -422,3 +422,147 @@ def download_data_from_swarm(reference: str) -> bytes:
     except requests.exceptions.RequestException as e:
         logger.error(f"Error downloading data from Swarm API ({api_url}): {e}")
         raise
+
+
+def get_wallet_info() -> Dict[str, Any]:
+    """
+    Fetches complete wallet information from the configured Swarm Bee node.
+
+    Returns:
+        Dictionary containing wallet address, BZZ balance, and other wallet data
+
+    Raises:
+        RequestException: If the HTTP request to the Swarm API fails
+        ValueError: If the response is malformed or missing expected fields
+    """
+    api_url = urljoin(str(settings.SWARM_BEE_API_URL), "wallet")
+    try:
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+
+        response_json = response.json()
+        wallet_address = response_json.get("walletAddress")
+        bzz_balance = response_json.get("bzzBalance")
+
+        if not wallet_address:
+            raise ValueError("API Response missing 'walletAddress' field")
+
+        logger.info(f"Successfully retrieved wallet info: {wallet_address}, balance: {bzz_balance}")
+        return response_json
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching wallet info from Swarm API ({api_url}): {e}")
+        raise
+    except (ValueError, KeyError) as e:
+        logger.error(f"Error parsing wallet response: {e}")
+        raise ValueError(f"Could not parse wallet response: {e}") from e
+
+
+def get_wallet_address() -> str:
+    """
+    Fetches the wallet address from the configured Swarm Bee node.
+
+    Deprecated: Use get_wallet_info() for full wallet data including balance.
+
+    Returns:
+        The wallet address of the Bee node
+
+    Raises:
+        RequestException: If the HTTP request to the Swarm API fails
+        ValueError: If the response is malformed or missing expected fields
+    """
+    wallet_info = get_wallet_info()
+    return wallet_info["walletAddress"]
+
+
+def get_chequebook_balance() -> Dict[str, Any]:
+    """
+    Fetches the chequebook balance information from the configured Swarm Bee node.
+
+    Returns:
+        Dictionary containing totalBalance and availableBalance
+
+    Raises:
+        RequestException: If the HTTP request to the Swarm API fails
+        ValueError: If the response is malformed or missing expected fields
+    """
+    api_url = urljoin(str(settings.SWARM_BEE_API_URL), "chequebook/balance")
+    try:
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+
+        response_json = response.json()
+        available_balance = response_json.get("availableBalance")
+
+        if available_balance is None:
+            raise ValueError("API Response missing 'availableBalance' field")
+
+        logger.info(f"Successfully retrieved chequebook balance: {available_balance}")
+        return response_json
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching chequebook balance from Swarm API ({api_url}): {e}")
+        raise
+    except (ValueError, KeyError) as e:
+        logger.error(f"Error parsing chequebook balance response: {e}")
+        raise ValueError(f"Could not parse chequebook balance response: {e}") from e
+
+
+def get_chequebook_info() -> Dict[str, Any]:
+    """
+    Fetches complete chequebook information including address and balance.
+
+    Returns:
+        Dictionary containing chequebook address and balance information
+
+    Raises:
+        RequestException: If the HTTP request to the Swarm API fails
+        ValueError: If the response is malformed or missing expected fields
+    """
+    try:
+        # Get chequebook address
+        address_api_url = urljoin(str(settings.SWARM_BEE_API_URL), "chequebook/address")
+        address_response = requests.get(address_api_url, timeout=10)
+        address_response.raise_for_status()
+        address_json = address_response.json()
+        chequebook_address = address_json.get("chequebookAddress")
+
+        if not chequebook_address:
+            raise ValueError("API Response missing 'chequebookAddress' field")
+
+        # Get chequebook balance
+        balance_info = get_chequebook_balance()
+
+        # Combine the information
+        chequebook_info = {
+            "chequebookAddress": chequebook_address,
+            "availableBalance": balance_info.get("availableBalance"),
+            "totalBalance": balance_info.get("totalBalance")
+        }
+
+        logger.info(f"Successfully retrieved chequebook info: {chequebook_address}, available: {balance_info.get('availableBalance')}")
+        return chequebook_info
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching chequebook info from Swarm API: {e}")
+        raise
+    except (ValueError, KeyError) as e:
+        logger.error(f"Error parsing chequebook info: {e}")
+        raise ValueError(f"Could not parse chequebook info: {e}") from e
+
+
+def get_chequebook_address() -> str:
+    """
+    Fetches the chequebook address from the configured Swarm Bee node.
+
+    Deprecated: Use get_chequebook_info() for full chequebook data including balance.
+
+    Returns:
+        The chequebook address of the Bee node
+
+    Raises:
+        RequestException: If the HTTP request to the Swarm API fails
+        ValueError: If the response is malformed or missing expected fields
+    """
+    chequebook_info = get_chequebook_info()
+    return chequebook_info["chequebookAddress"]
