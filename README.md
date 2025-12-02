@@ -330,3 +330,21 @@ Get the chequebook address and balance information of the connected Bee node.
   - `availableBalance`: Funds available for creating new postage stamps (in wei)
   - `totalBalance`: Total funds in the chequebook (in wei)
 - **Note**: Only available when connected to local Bee nodes, not public gateways
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) - see the LICENSE file for details.
+
+### License Summary
+- ✅ **Commercial use** - Use in commercial applications
+- ✅ **Distribution** - Distribute copies or substantial portions
+- ✅ **Modification** - Modify and create derivative works
+- ✅ **Private use** - Use privately without restrictions
+- ⚠️ **Include license** - Include MIT license and copyright notice
+- ❌ **No liability** - No warranty or liability from authors
+
+The MIT License encourages adoption while maintaining attribution, making it ideal for:
+- Research and academic projects
+- Commercial integrations
+- Open-source ecosystem growth
+- Ethereum/Web3 community standards
