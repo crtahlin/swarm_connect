@@ -61,7 +61,7 @@ class TestDepthValidation:
         valid_depths = [16, 17, 18, 20, 24, 32]
 
         for depth in valid_depths:
-            purchase_data = {"amount": 2000000000, "depth": depth}
+            purchase_data = {"amount": 8000000000, "depth": depth}
             response = client.post("/api/v1/stamps/", json=purchase_data)
             # Should pass validation (may fail at service level)
             assert response.status_code in [201, 502], f"Valid depth {depth} should pass validation"
@@ -74,7 +74,7 @@ class TestDepthValidation:
         ]
 
         for depth in invalid_depths:
-            purchase_data = {"amount": 2000000000, "depth": depth}
+            purchase_data = {"amount": 8000000000, "depth": depth}
             response = client.post("/api/v1/stamps/", json=purchase_data)
             assert response.status_code == 422, f"Invalid depth {depth} should be rejected"
 
@@ -89,7 +89,7 @@ class TestDepthValidation:
         ]
 
         for depth in invalid_depths:
-            purchase_data = {"amount": 2000000000, "depth": depth}
+            purchase_data = {"amount": 8000000000, "depth": depth}
             response = client.post("/api/v1/stamps/", json=purchase_data)
             assert response.status_code == 422, f"Non-integer depth {depth} should be rejected"
 
@@ -100,17 +100,17 @@ class TestLabelValidation:
     def test_label_optional_field(self):
         """Test that label is properly optional."""
         # Without label
-        purchase_data = {"amount": 2000000000, "depth": 17}
+        purchase_data = {"amount": 8000000000, "depth": 17}
         response = client.post("/api/v1/stamps/", json=purchase_data)
         assert response.status_code in [201, 502], "Request without label should be valid"
 
         # With null label
-        purchase_data = {"amount": 2000000000, "depth": 17, "label": None}
+        purchase_data = {"amount": 8000000000, "depth": 17, "label": None}
         response = client.post("/api/v1/stamps/", json=purchase_data)
         assert response.status_code in [201, 502], "Request with null label should be valid"
 
         # With empty string label
-        purchase_data = {"amount": 2000000000, "depth": 17, "label": ""}
+        purchase_data = {"amount": 8000000000, "depth": 17, "label": ""}
         response = client.post("/api/v1/stamps/", json=purchase_data)
         assert response.status_code in [201, 502], "Request with empty label should be valid"
 
@@ -128,7 +128,7 @@ class TestLabelValidation:
         ]
 
         for label in valid_labels:
-            purchase_data = {"amount": 2000000000, "depth": 17, "label": label}
+            purchase_data = {"amount": 8000000000, "depth": 17, "label": label}
             response = client.post("/api/v1/stamps/", json=purchase_data)
             assert response.status_code in [201, 502], f"Valid label '{label}' should be accepted"
 
@@ -136,13 +136,13 @@ class TestLabelValidation:
         """Test label length constraints."""
         # Test reasonable length label
         medium_label = "a" * 100
-        purchase_data = {"amount": 2000000000, "depth": 17, "label": medium_label}
+        purchase_data = {"amount": 8000000000, "depth": 17, "label": medium_label}
         response = client.post("/api/v1/stamps/", json=purchase_data)
         assert response.status_code in [201, 502], "Medium length label should be accepted"
 
         # Test very long label (should be handled gracefully)
         very_long_label = "a" * 10000
-        purchase_data = {"amount": 2000000000, "depth": 17, "label": very_long_label}
+        purchase_data = {"amount": 8000000000, "depth": 17, "label": very_long_label}
         response = client.post("/api/v1/stamps/", json=purchase_data)
         # Should either accept or reject gracefully
         assert response.status_code in [201, 422, 502], "Very long label should be handled gracefully"
@@ -158,7 +158,7 @@ class TestLabelValidation:
         ]
 
         for label in invalid_labels:
-            purchase_data = {"amount": 2000000000, "depth": 17, "label": label}
+            purchase_data = {"amount": 8000000000, "depth": 17, "label": label}
             response = client.post("/api/v1/stamps/", json=purchase_data)
             assert response.status_code == 422, f"Non-string label {type(label)} should be rejected"
 
@@ -166,31 +166,38 @@ class TestLabelValidation:
 class TestRequestStructureValidation:
     """Tests for overall request structure validation."""
 
-    def test_missing_required_fields(self):
-        """Test that missing required fields are rejected."""
-        # Missing amount
+    def test_optional_fields_with_defaults(self):
+        """Test that amount and depth are optional with sensible defaults.
+
+        Since we now support duration-based purchasing with defaults:
+        - duration_hours defaults to 25
+        - size defaults to 'small' (depth 17)
+        - Empty request should succeed using defaults
+        """
+        # Missing amount - should use duration-based calculation
         request_data = {"depth": 17}
         response = client.post("/api/v1/stamps/", json=request_data)
-        assert response.status_code == 422, "Missing amount should be rejected"
+        # Should succeed (502 means it reached Bee API, which is expected in tests)
+        assert response.status_code in [201, 400, 502], "Missing amount should use duration default"
 
-        # Missing depth
-        request_data = {"amount": 2000000000}
+        # Missing depth - should use default depth 17
+        request_data = {"amount": 8000000000}
         response = client.post("/api/v1/stamps/", json=request_data)
-        assert response.status_code == 422, "Missing depth should be rejected"
+        assert response.status_code in [201, 400, 502], "Missing depth should use default"
 
-        # Missing both
+        # Only label provided - should use all defaults
         request_data = {"label": "test"}
         response = client.post("/api/v1/stamps/", json=request_data)
-        assert response.status_code == 422, "Missing required fields should be rejected"
+        assert response.status_code in [201, 400, 502], "Should use all defaults"
 
-        # Empty request
+        # Empty request - should use all defaults (25 hours, depth 17)
         response = client.post("/api/v1/stamps/", json={})
-        assert response.status_code == 422, "Empty request should be rejected"
+        assert response.status_code in [201, 400, 502], "Empty request should use defaults"
 
     def test_extra_fields_handling(self):
         """Test handling of extra/unknown fields in requests."""
         request_data = {
-            "amount": 2000000000,
+            "amount": 8000000000,
             "depth": 17,
             "label": "test",
             "unknown_field": "should_be_ignored",
@@ -204,7 +211,7 @@ class TestRequestStructureValidation:
     def test_nested_object_validation(self):
         """Test that nested objects in fields are rejected."""
         request_data = {
-            "amount": {"value": 2000000000},  # Nested object instead of integer
+            "amount": {"value": 8000000000},  # Nested object instead of integer
             "depth": 17
         }
 
@@ -247,7 +254,7 @@ class TestStampIdValidation:
 
     def test_stamp_id_in_extend_endpoint(self):
         """Test stamp ID validation in extend endpoint."""
-        extend_data = {"amount": 2000000000}
+        extend_data = {"amount": 8000000000}
 
         # Valid ID format
         valid_id = "000de42079daebd58347bb38ce05bdc477701d93651d3bba318a9aee3fbd786a"
@@ -266,7 +273,7 @@ class TestContentTypeValidation:
     def test_json_content_type_required(self):
         """Test that JSON content type is required for POST/PATCH requests."""
         # Test with incorrect content type
-        purchase_data = '{"amount": 2000000000, "depth": 17}'
+        purchase_data = '{"amount": 8000000000, "depth": 17}'
 
         response = client.post(
             "/api/v1/stamps/",
@@ -282,11 +289,11 @@ class TestContentTypeValidation:
     def test_malformed_json_handling(self):
         """Test handling of malformed JSON."""
         malformed_json_examples = [
-            '{"amount": 2000000000, "depth": 17,}',      # Trailing comma
-            '{"amount": 2000000000 "depth": 17}',        # Missing comma
-            '{amount: 2000000000, depth: 17}',           # Unquoted keys
-            '{"amount": 2000000000, "depth":}',          # Missing value
-            '{"amount": 2000000000, "depth": 17',        # Unclosed brace
+            '{"amount": 8000000000, "depth": 17,}',      # Trailing comma
+            '{"amount": 8000000000 "depth": 17}',        # Missing comma
+            '{amount: 8000000000, depth: 17}',           # Unquoted keys
+            '{"amount": 8000000000, "depth":}',          # Missing value
+            '{"amount": 8000000000, "depth": 17',        # Unclosed brace
         ]
 
         for malformed in malformed_json_examples:
@@ -336,7 +343,7 @@ class TestBusinessRuleValidation:
 
         def make_request():
             try:
-                purchase_data = {"amount": 2000000000, "depth": 17}
+                purchase_data = {"amount": 8000000000, "depth": 17}
                 response = client.post("/api/v1/stamps/", json=purchase_data)
                 if response.status_code == 422:
                     validation_errors.append(response.json())
